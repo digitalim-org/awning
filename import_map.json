@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "preact-render-to-string": "https://cdn.skypack.dev/preact-render-to-string",
+    "preact": "https://esm.sh/preact"
+  }
+}

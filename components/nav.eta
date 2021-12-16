@@ -1,0 +1,22 @@
+<nav class="navbar">
+    <% ctx.items.forEach(({label, href})=> { %>
+        <a href="<%= href %>" class="navbar-item">
+            <%_= label _%>
+        </a>
+        <% }) %>
+</nav>
+
+<style>
+    .navbar {
+        display: flex;
+        justify-content: end;
+    }
+
+    .navbar-item {
+        font-size: 1rem;
+    }
+
+    .navbar-item:not(:last-child) {
+        margin-right: 1rem;
+    }
+</style>
