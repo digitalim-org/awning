@@ -1,0 +1,4 @@
+scripts:
+  format:
+    cmd: deno fmt
+    gitHook: pre-commit

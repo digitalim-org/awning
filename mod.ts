@@ -1,3 +1,10 @@
+// declare global {
+//   interface Window {
+//     // deno-lint-ignore no-explicit-any
+//     getData: (key: string) => any;
+//   }
+// }
+
 import {
   Application,
   Router,
@@ -34,7 +41,7 @@ interface PageContainerProps {
 
 interface Ctx {}
 
-export default ({
+export default async ({
   port = 5555,
   root,
   routes,
@@ -48,14 +55,46 @@ export default ({
     logger.debug(response);
   });
 
+  interface sessionDataIface {
+    currentRoute: string | null;
+  }
+
+  const sessionData: sessionDataIface = {
+    currentRoute: null,
+  };
+  app.use(async ({ request }, next) => {
+    sessionData.currentRoute = request.url.pathname;
+    await next();
+  });
+
   const router = new Router();
+
+  const userlandData = (await import(`${root}/data/mod.ts`)).default;
+
+  // deno-lint-ignore ban-types
+  const withCustomContext = (fn: Function) => {
+    return (name: string, data: Record<string, unknown>) => {
+      const resolvedData = data &&
+        Object.entries(data).reduce((obj, [key, val]) => ({
+          ...obj,
+          [key]: typeof val === "function" ? val(userlandData) : val,
+        }), {});
+      return fn.call(config, name, { ...resolvedData, session: sessionData });
+    };
+  };
 
   configure({
     root,
     varName: "ctx",
     // rmWhitespace: true,
     views: [`${root}/views`, `${awningRoot}/views`],
+    includeFile: withCustomContext(config.includeFile!),
+    // includeFile: config.includeFile!,
   });
+
+  // window.getData = (key) => {
+  //   return data.default[key];
+  // };
 
   if (dev) {
     configure({
@@ -85,16 +124,20 @@ export default ({
   }
 
   Object.entries(routes).forEach(([route, view]) => {
-    router.get(route, async ({ response }, next) => {
+    router.get(route, async ({ response, ...ctx }, next) => {
+      sessionData;
       logger.debug(config.templates);
       const viewURL = `${view}.eta`;
       try {
         response.body = await render(
           `
         ${layoutShell} 
-        ${await renderFile(viewURL, {}, { filename: viewURL })}
+        ${await renderFile(viewURL, { bar: "quuux" }, {
+            filename: viewURL,
+            foo: "bar",
+          })}
       `,
-          {},
+          { foob: "quux" },
           {
             name: view,
           },
