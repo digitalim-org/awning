@@ -1,7 +1,0 @@
-<!DOCTYPE html>
-<html>
-    <%~ includeFile('_head.eta') %>
-    <body>
-        <%~ ctx.body %>
-    </body>
-</html>

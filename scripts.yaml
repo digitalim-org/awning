@@ -1,4 +1,4 @@
 scripts:
   format:
-    cmd: deno fmt
+    cmd: (deno lint && deno fmt) || exit 1
     gitHook: pre-commit

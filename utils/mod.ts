@@ -17,3 +17,10 @@ export const trimTrailingSlash = (str: string) => {
 
 export const getDirname = (filepath: string) =>
   trimTrailingSlash(new URL(".", filepath).pathname);
+
+export const titleCase = (str: string) =>
+  str[0].toUpperCase() + str.slice(1).toLowerCase();
+
+const decoder = new TextDecoder("utf-8");
+export const readFileSync = (filepath: string) =>
+  decoder.decode(Deno.readFileSync(filepath));
