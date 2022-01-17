@@ -1,3 +1,4 @@
+/** @jsxImportSource https://esm.sh/preact */
 import {
   Application,
   Router,
@@ -8,7 +9,12 @@ import { parse } from "https://deno.land/std@0.117.0/path/mod.ts";
 import { getDirname } from "./utils/mod.ts";
 import logger from "./logger/mod.ts";
 import Head from "./components/Head.tsx";
-import { ComponentType, RenderableProps, renderToString } from "./deps.ts";
+import {
+  ComponentType,
+  debounce,
+  RenderableProps,
+  renderToString,
+} from "./deps.ts";
 import { readFileSync, titleCase } from "./utils/mod.ts";
 
 const awningRoot = getDirname(import.meta.url);
@@ -113,7 +119,6 @@ export default ({
         <!DOCTYPE html>
         <html>
           <head>
-            <script src="js/connector.js"></script>
             <style>
               ${commonCSS}
               ${resolvedRouteData.css}
@@ -144,9 +149,27 @@ export default ({
     if (ctx.isUpgradable) {
       const ws = await ctx.upgrade();
 
-      ws.onclose = console.log;
-      ws.onerror = console.log;
-      ws.onmessage = console.log;
+      // ws.onclose = console.log;
+      // ws.onerror = console.log;
+      // ws.onmessage = console.log;
+
+      const watcher = Deno.watchFs([
+        `${root}/components`,
+      ], {
+        recursive: true,
+      });
+
+      const notify = debounce((event) => {
+        console.log("after", event);
+        ws.send(JSON.stringify({
+          cmd: "reload",
+        }));
+      }, 200);
+
+      for await (const event of watcher) {
+        console.log("before", event);
+        notify(event);
+      }
     } else {
       ctx.throw(500);
     }
@@ -154,11 +177,55 @@ export default ({
 
   app.use(router.routes());
   app.use(router.allowedMethods());
-  app.use(async (context) => {
-    try {
-      await context.send({ root: `${root}/public` });
-    } catch {
-      await context.send({ root: `${awningRoot}/public` });
+  app.use(async (ctx) => {
+    const { pathname } = ctx.request.url;
+    const { ext, base } = parse(pathname);
+    if ([".ts", ".tsx"].includes(ext)) {
+      try {
+        const filePath = `${awningRoot}/public${pathname}`;
+        await Deno.stat(filePath);
+        try {
+          const bundle = await Deno.emit(filePath, {
+            check: false,
+            bundle: "module",
+            compilerOptions: {
+              jsxFactory: "h",
+              // jsx: "react-jsx",
+              jsxImportSource: "https://esm.sh/preact",
+            },
+            // bundle: "module",
+            // check: true,
+            // sources: {
+            //   "Index.tsx": `${root}/components/Index.tsx`,
+            // },
+          });
+          ctx.response.body = bundle.files["deno:///bundle.js"];
+          ctx.response.type = ".js";
+        } catch (e) {
+          ctx.throw(e);
+        }
+      } catch (e) {
+        const filePath = `${root}${pathname}`;
+        await Deno.stat(filePath);
+        const bundle = await Deno.emit(filePath, {
+          bundle: "module",
+          check: false,
+          compilerOptions: {
+            jsxFactory: "h",
+            // jsx: "react-jsx",
+            jsxImportSource: "https://esm.sh/preact",
+          },
+        });
+        debugger;
+        ctx.response.body = bundle.files["deno:///bundle.js"];
+        ctx.response.type = ".js";
+      }
+    } else {
+      try {
+        await ctx.send({ root: `${root}/public` });
+      } catch {
+        await ctx.send({ root: `${awningRoot}/public` });
+      }
     }
   });
 
