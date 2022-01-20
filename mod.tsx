@@ -8,7 +8,7 @@ import { parse } from "https://deno.land/std@0.117.0/path/mod.ts";
 // import { ensureFile } from "https://deno.land/std@0.117.0/fs/mod.ts";
 import { getDirname } from "./utils/mod.ts";
 import logger from "./logger/mod.ts";
-import Head from "./components/Head.tsx";
+import Head from "./components/core/Head.tsx";
 import {
   ComponentType,
   debounce,
@@ -52,9 +52,9 @@ export default ({
   const app = new Application<Ctx>();
 
   app.use(async ({ request, response }, next) => {
-    logger.debug(request);
+    logger.debug(`request-url: ${request.url}`);
     await next();
-    logger.debug(response);
+    // logger.debug(response);
   });
 
   const sessionData: SessionData = {
@@ -66,23 +66,6 @@ export default ({
   });
 
   const router = new Router();
-
-  // if (dev) {
-  // } else {
-  // for (const component of Deno.readDirSync(awningComponents)) {
-  //   if (component.isFile) {
-  //     const { name } = parse(component.name);
-  //     const templfn = compile(
-  //       decoder.decode(
-  //         Deno.readFileSync(`${awningComponents}/${component.name}`),
-  //       ),
-  //     );
-  //     templates.define(name, templfn);
-  //   } else {
-  //     throw new Error(`${component.name} should be a component file`);
-  //   }
-  // }
-  // }
 
   Object.entries(routes).forEach(async ([route, nameOrConfig]) => {
     let resolvedRouteData: RouteConfig;
@@ -155,20 +138,20 @@ export default ({
 
       const watcher = Deno.watchFs([
         `${root}/components`,
-      ], {
-        recursive: true,
-      });
+        `${awningRoot}/components`,
+      ]);
 
       const notify = debounce((event) => {
-        console.log("after", event);
+        logger.debug("watched file modified - sending reload");
         ws.send(JSON.stringify({
           cmd: "reload",
         }));
       }, 200);
 
       for await (const event of watcher) {
-        console.log("before", event);
-        notify(event);
+        if (event.kind === "modify") {
+          notify(event);
+        }
       }
     } else {
       ctx.throw(500);
@@ -216,7 +199,6 @@ export default ({
             jsxImportSource: "https://esm.sh/preact",
           },
         });
-        debugger;
         ctx.response.body = bundle.files["deno:///bundle.js"];
         ctx.response.type = ".js";
       }
