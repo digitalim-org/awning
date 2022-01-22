@@ -1,30 +1,35 @@
 /** @jsxImportSource https://esm.sh/preact */
 import { SessionData } from "../../mod.tsx";
-import { ComponentType, JSX } from "../../deps.ts";
-import { Properties } from "https://esm.sh/csstype/index.d.ts";
+import { ComponentType, JSX, VNode } from "../../deps.ts";
+import { css } from "../../styling/builder.ts";
 
 interface NavProps {
   itemsStart?: ComponentType[];
+  itemsMiddle?: ComponentType[];
+  itemsEnd?: (VNode | string | number)[];
 }
 
-type Styles = Record<string, Properties>;
-
-const styles: Styles = {
+const { navbar } = css({
   navbar: {
     display: "flex",
-    justifyContent: "end",
-    marginTop: "20rem",
+    width: "100%",
   },
-};
+});
 
-const Nav = ({ itemsStart }: NavProps) => (
-  <nav class="navbar" style={styles.navbar as JSX.CSSProperties}>
-    <h1>fdieee</h1>
-    <h2>food?</h2>
-    <div class="navbar_start">
-      {itemsStart?.map((Item) => <Item />)}
-    </div>
-  </nav>
-);
+const Nav = ({ itemsStart, itemsMiddle, itemsEnd }: NavProps) => {
+  return (
+    <nav className={navbar}>
+      <div className="navbar_start">
+        {itemsStart?.map((Item) => <Item />)}
+      </div>
+      <div className="navbar_middle">
+        {itemsMiddle?.map((Item) => <Item />)}
+      </div>
+      <div className="navbar_end">
+        {itemsEnd}
+      </div>
+    </nav>
+  );
+};
 
 export default Nav;

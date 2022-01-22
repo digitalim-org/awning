@@ -16,6 +16,8 @@ import {
   renderToString,
 } from "./deps.ts";
 import { readFileSync, titleCase } from "./utils/mod.ts";
+import { stylesheets } from "./styling/builder.ts";
+import { isDev } from "./utils/is.ts";
 
 const awningRoot = getDirname(import.meta.url);
 const awningComponents = `${awningRoot}/components`;
@@ -26,7 +28,6 @@ export type AwningPageProps = RenderableProps<{
 
 interface RouteConfig {
   component: ComponentType<AwningPageProps>;
-  css: string;
 }
 
 export interface AwningConfiguration {
@@ -76,7 +77,6 @@ export default ({
           component:
             (await import(`${root}/components/${titleCase(nameOrConfig)}.tsx`))
               .default,
-          css: readFileSync(`${root}/css/${nameOrConfig.toLowerCase()}.css`),
         };
         break;
       case "object":
@@ -90,22 +90,27 @@ export default ({
 
     const UserlandHead = (await import(`${root}/components/Head.tsx`)).default;
 
-    let commonCSS = "";
-    try {
-      commonCSS = readFileSync(`${root}/css/common.css`);
-    } catch (_e) {
-      logger.info("No common.css file used.");
-    }
-
     router.get(route, async ({ response, ...context }, next) => {
+      const rendered = renderToString(
+        <resolvedRouteData.component session={{ currentRoute: route }} />,
+      );
       response.body = `
         <!DOCTYPE html>
         <html>
           <head>
-            <style>
-              ${commonCSS}
-              ${resolvedRouteData.css}
-            </style>
+            ${
+        stylesheets.map(([marker, ss]) =>
+          `<style data-styles-id="${marker}">${ss}</style>`
+        )
+          .join("")
+      }
+            <script>
+            ${
+        isDev && `
+                window.AWNING_DEV = true;
+              `
+      }
+            </script>
             ${
         renderToString(
           <Head>
@@ -115,11 +120,7 @@ export default ({
       }
           </head>
           <body>
-            ${
-        renderToString(
-          <resolvedRouteData.component session={{ currentRoute: route }} />,
-        )
-      }
+            ${rendered}
           </body>
         </html>
       `;
@@ -132,14 +133,30 @@ export default ({
     if (ctx.isUpgradable) {
       const ws = await ctx.upgrade();
 
-      // ws.onclose = console.log;
-      // ws.onerror = console.log;
-      // ws.onmessage = console.log;
-
       const watcher = Deno.watchFs([
         `${root}/components`,
         `${awningRoot}/components`,
       ]);
+
+      const safeCloseWatcher = () => {
+        try {
+          watcher.close();
+        } catch {
+          logger.debug("watcher failed to close");
+        }
+      };
+
+      ws.onclose = (ev) => {
+        console.log("ws close");
+        safeCloseWatcher();
+      };
+
+      ws.onerror = (ev) => {
+        console.log("ws error", ev);
+        safeCloseWatcher();
+      };
+
+      ws.onmessage = console.log;
 
       const notify = debounce((event) => {
         logger.debug("watched file modified - sending reload");
