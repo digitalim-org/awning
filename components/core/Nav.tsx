@@ -12,6 +12,7 @@ interface NavProps {
 const { navbar } = css({
   navbar: {
     display: "flex",
+    justifyContent: "space-between",
     width: "100%",
   },
 });

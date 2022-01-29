@@ -17,6 +17,10 @@ const Head = ({ children, title }: RenderableProps<HeadProps>) => (
     <script src="js/hydrate-root.tsx" type="module"></script>
     <link
       rel="stylesheet"
+      href="/awning/public/css/common.css"
+    />
+    <link
+      rel="stylesheet"
       href="https://unpkg.com/normalize.css@8.0.1/normalize.css"
     />
     {children}

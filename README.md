@@ -6,3 +6,6 @@
 - [ ] LiveReload for dev
 - [ ] Static rendering
 - [ ] Awning CLI
+- [ ] IndexedDB priming
+
+https://www.sqlite.org/whentouse.html

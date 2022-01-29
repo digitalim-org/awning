@@ -18,6 +18,7 @@ import {
 import { readFileSync, titleCase } from "./utils/mod.ts";
 import { stylesheets } from "./styling/builder.ts";
 import { isDev } from "./utils/is.ts";
+import { Database, Model } from "./db/mod.ts";
 
 const awningRoot = getDirname(import.meta.url);
 const awningComponents = `${awningRoot}/components`;
@@ -34,7 +35,7 @@ export interface AwningConfiguration {
   port?: number;
   root: string;
   routes: Record<string, string | RouteConfig>;
-  dev?: boolean;
+  models?: typeof Model[];
 }
 
 export interface SessionData {
@@ -45,12 +46,17 @@ export default ({
   port = 5555,
   root,
   routes,
-  dev = false,
+  models,
 }: AwningConfiguration) => {
   interface Ctx {
     foo: string;
   }
   const app = new Application<Ctx>();
+
+  if (models?.length) {
+    const { db, createTable } = new Database();
+    models.forEach(createTable);
+  }
 
   app.use(async ({ request, response }, next) => {
     logger.debug(`request-url: ${request.url}`);
@@ -69,31 +75,38 @@ export default ({
   const router = new Router();
 
   Object.entries(routes).forEach(async ([route, nameOrConfig]) => {
-    let resolvedRouteData: RouteConfig;
+    // let resolvedRouteData: RouteConfig;
 
-    switch (typeof nameOrConfig) {
-      case "string":
-        resolvedRouteData = {
-          component:
-            (await import(`${root}/components/${titleCase(nameOrConfig)}.tsx`))
-              .default,
-        };
-        break;
-      case "object":
-        resolvedRouteData = nameOrConfig;
-        break;
-      default:
-        throw new Error(
-          `Expected string or object but RouteConfig is ${typeof nameOrConfig}.`,
-        );
-    }
+    // switch (typeof nameOrConfig) {
+    //   case "string":
+    //     resolvedRouteData = {
+    //       component:
+    //         (await import(`${root}/components/${titleCase(nameOrConfig)}.tsx`))
+    //           .default,
+    //     };
+    //     break;
+    //   case "object":
+    //     resolvedRouteData = nameOrConfig;
+    //     break;
+    //   default:
+    //     throw new Error(
+    //       `Expected string or object but RouteConfig is ${typeof nameOrConfig}.`,
+    //     );
+    // }
 
     const UserlandHead = (await import(`${root}/components/Head.tsx`)).default;
 
+    let foo = 0;
     router.get(route, async ({ response, ...context }, next) => {
+      console.log(stylesheets);
+      const Component = (await import(
+        `${root}/components/${titleCase(nameOrConfig as string)}.tsx?${foo++}`
+      )).default;
+
       const rendered = renderToString(
-        <resolvedRouteData.component session={{ currentRoute: route }} />,
+        <Component session={{ currentRoute: route }} />,
       );
+
       response.body = `
         <!DOCTYPE html>
         <html>
@@ -179,7 +192,7 @@ export default ({
   app.use(router.allowedMethods());
   app.use(async (ctx) => {
     const { pathname } = ctx.request.url;
-    const { ext, base } = parse(pathname);
+    const { ext, dir } = parse(pathname);
     if ([".ts", ".tsx"].includes(ext)) {
       try {
         const filePath = `${awningRoot}/public${pathname}`;
@@ -220,10 +233,19 @@ export default ({
         ctx.response.type = ".js";
       }
     } else {
-      try {
-        await ctx.send({ root: `${root}/public` });
-      } catch {
-        await ctx.send({ root: `${awningRoot}/public` });
+      if (/^\/awning\//.test(dir)) {
+        try {
+          // Slice off /awning/public
+          await send(ctx, pathname.slice(14), { root: `${awningRoot}/public` });
+        } catch (e) {
+          ctx.throw(e);
+        }
+      } else {
+        try {
+          await ctx.send({ root: `${root}/public` });
+        } catch (e) {
+          ctx.throw(e);
+        }
       }
     }
   });
