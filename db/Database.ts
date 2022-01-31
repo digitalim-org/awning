@@ -7,7 +7,7 @@ interface DatabaseOpts {
   memory?: boolean;
 }
 
-type CreateTableOpts = { model: typeof Model } | {
+type CreateTableOpts = typeof Model | {
   name: string;
   columns: string[];
 };
@@ -33,14 +33,10 @@ export default class Database extends DB {
     );
   }
 
-  createTable(opts: CreateTableOpts) {
-    let name, columns;
-    if ("name" in opts) {
-      name = opts.name;
-      columns = opts.columns;
-    } else {
-      name = Model.pluralize(opts.model);
-      columns = opts.model.columns;
+  createTable(modelOrOpts: CreateTableOpts) {
+    let { name, columns } = modelOrOpts;
+    if (Object.prototype.isPrototypeOf.call(Model, modelOrOpts)) {
+      name = Model.pluralize(modelOrOpts as typeof Model);
     }
 
     const sanitizer = /[A-Za-z]+/;
@@ -56,12 +52,16 @@ export default class Database extends DB {
       throw new ReferenceError(`Table ${name} has no columns?`);
     }
 
-    this.query(`CREATE TABLE ${name} (${columns.join(", ")})`);
+    const query = `CREATE TABLE ${name} (${columns.join(", ")})`;
+
+    logger.debug(query);
+
+    this.query(query);
   }
 
   createTables(models: typeof Model[]) {
     models.forEach((model) => {
-      this.createTable({ model });
+      this.createTable(model);
     });
   }
 

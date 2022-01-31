@@ -1,6 +1,7 @@
 import * as log from "https://deno.land/std@0.117.0/log/mod.ts";
+import { isDev } from "../utils/is.ts";
 
-const logLevel: log.LevelName = "INFO";
+const logLevel: log.LevelName = isDev ? "DEBUG" : "INFO";
 
 await log.setup({
   handlers: {

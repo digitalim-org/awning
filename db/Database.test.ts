@@ -27,17 +27,15 @@ describe("Database", () => {
 
     createTable(Foo);
     const foosTable = query<string[]>(
-      "SELECT name FROM sqlite_schema WHERE type='table' AND name='foos'",
+      "SELECT name FROM sqlite_schema WHERE type='table'",
     );
-
-    console.log("bar", foosTable);
 
     assertEquals(foosTable[0][0], "foos");
   });
 });
 
 describe("Relationships", () => {
-  focus("Creates a junction table for many-to-many relationships", () => {
+  it("Creates a junction table for many-to-many relationships", () => {
     const { query, createJunctionTables } = db;
     class Foo extends Model {}
     class Bar extends Model {}
@@ -47,8 +45,6 @@ describe("Relationships", () => {
     const junctionTable = query<string[]>(
       "SELECT name FROM sqlite_schema WHERE type='table'",
     );
-
-    console.log("foo", junctionTable);
 
     assertEquals(junctionTable[0][0], "foos_bars");
   });
