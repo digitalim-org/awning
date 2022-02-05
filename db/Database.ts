@@ -36,7 +36,7 @@ export default class Database extends DB {
   createTable(modelOrOpts: CreateTableOpts) {
     let { name, columns } = modelOrOpts;
     if (Object.prototype.isPrototypeOf.call(Model, modelOrOpts)) {
-      name = Model.pluralize(modelOrOpts as typeof Model);
+      name = (modelOrOpts as typeof Model).pluralize();
     }
 
     const sanitizer = /[A-Za-z]+/;
@@ -81,13 +81,11 @@ export default class Database extends DB {
       switch (relationship) {
         case ">-<":
           {
-            const firstModel = models[first];
-            const secondModel = models[second];
+            const Model1 = models[first];
+            const Model2 = models[second];
 
             this.createTable({
-              name: `${Model.pluralize(firstModel)}_${
-                Model.pluralize(secondModel)
-              }`,
+              name: `${Model1.pluralize()}_${Model2.pluralize()}`,
               columns: [
                 `${first.toLowerCase()}_id`,
                 `${second.toLowerCase()}_id`,
