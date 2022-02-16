@@ -1,37 +1,48 @@
 import Model from "./Model.ts";
+import type { Getters } from "./Database.ts";
+import { Associate } from "./Association.ts";
 
-export class Item extends Model {
-  static columns = ["name", "price"];
-  declare public name: string;
-  declare public price: number;
+type UserModels = {
+  item: Item;
+  product: Product;
+  category: Category;
+};
+
+declare module "./Database.ts" {
+  interface Database extends Getters<UserModels> {}
 }
 
-// type ValueOf<T> = T extends ReadonlyArray<any> ? T[number] : T[keyof T]
+export type ItemType = {
+  name: string;
+  price: number;
+};
 
-// type ProductType = Record<ValueOf<typeof Product.columns>, string | number>
+export interface Item extends ItemType {}
+export class Item extends Model<ItemType> {
+  static columns = ["name", "price"];
+}
 
 type ProductType = {
   color: string;
   qty: number;
+  // categories?: Category[];
 };
 
-export interface Product extends ProductType {}
-
-export class Product extends Model<ProductType> {
+export interface Product extends ProductType {
+  categories: Associate<Category>;
+}
+export class Product extends Model<ProductType & { categories?: Category[] }> {
   static columns = ["color", "qty"];
-  // declare public color: string;
-  // declare public qty: number;
-  // [field: keyof ProductType]: ProductType[keyof ProductType]
-
-  // constructor(product: ProductType) {
-  //   super(product)
-  // }
-
-  addToCategory(category: Category) {
-  }
 }
 
-export class Category extends Model {
+type CategoryType = {
+  name: string;
+  products?: () => Product[];
+};
+
+export interface Category extends CategoryType {
+  products: Associate<Product>;
+}
+export class Category extends Model<CategoryType> {
   static columns = ["name"];
-  declare public name: string;
 }

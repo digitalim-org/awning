@@ -3,4 +3,4 @@ scripts:
     cmd: (deno lint && deno fmt) || exit 1
     gitHook: pre-commit
   test:
-    cmd: AWNING_DEV=true deno test db/Relationships.test.ts --watch --allow-env 
+    cmd: AWNING_DEV=true deno test --watch --allow-env

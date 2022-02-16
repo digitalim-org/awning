@@ -1,20 +1,7 @@
-import { Database, faker, Relationships } from "./deps.ts";
-import Product from "./models/product.ts";
-import Category from "./models/category.ts";
+import { faker, DB } from "./deps.ts";
 
-export default async (db: Database) => {
-  const ProductCategory = Relationships.manyToMany(Product, Category);
-
-  await db
-    .link([ProductCategory, Product, Category])
-    .sync({ drop: true });
-
-  for (let i = 0; i < 5; i++) {
-    const category = await Category.create({
-      name: faker.commerce.department(),
-    });
-    await category.save();
-    console.log("category", category);
+export default async (db: DB) => {
+    db. 
 
     // ProductCategory.create({
     //   categoryId: category.id,

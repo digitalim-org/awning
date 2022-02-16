@@ -53,10 +53,10 @@ export default ({
   }
   const app = new Application<Ctx>();
 
-  if (models?.length) {
-    const { db, createTable } = new Database();
-    models.forEach(createTable);
-  }
+  // if (models?.length) {
+  //   const { db, createTable } = new Database();
+  //   models.forEach(createTable);
+  // }
 
   app.use(async ({ request, response }, next) => {
     logger.debug(`request-url: ${request.url}`);

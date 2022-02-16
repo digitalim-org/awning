@@ -1,22 +1,22 @@
 import { QueryParameterSet } from "./deps.ts";
 import logger from "../logger/mod.ts";
-import Database from "./Database.ts";
+import { Database } from "./Database.ts";
+import Association from "./Association.ts";
 
-export type ModelType = {
-  id: number;
-};
+type ModelCtor = Omit<typeof Model, "new">;
 
-export default abstract class Model<T extends Record<string, unknown>> {
+export interface DerivedModel<T = Record<string, unknown>> extends ModelCtor {
+  new (fields: T): Model;
+}
+
+// T is the interface for "fields"
+export default abstract class Model<T = Record<string, unknown>> {
   [field: string]: unknown
+  public isSaved = false;
   declare public id: number;
 
-  declare public static db: Database;
   declare public static columns: string[];
-
-  static bindDatabase(db: Database) {
-    Object.assign(this, { db });
-    db.createTable(this);
-  }
+  declare public static associations: Association[];
 
   static pluralize() {
     const name = this.name.toLowerCase();
@@ -30,49 +30,52 @@ export default abstract class Model<T extends Record<string, unknown>> {
     }
   }
 
-  static by_id(id: number) {
-    const query = `SELECT * FROM ${this.pluralize()} WHERE OID = ?`;
-
-    logger.debug(`${query} with ${id}`);
-
-    const rows = this.db.query<typeof this.columns>(query, [id]);
-
-    if (rows.length === 0) return null;
-
-    // There should only ever be one row since this is an id lookup.
-    return rows[0].reduce((obj, val, index) => ({
-      ...obj,
-      [this.columns[index]]: val,
-    }), {});
+  static tableName() {
+    return this.pluralize();
   }
 
-  constructor(fields: T) {
-    Object.assign(this, fields);
-    this as T;
+  constructor(fields: T & { isSaved?: boolean }) {
+    const proxy = new Proxy(Object.assign(this, fields), {
+      set(target, prop, val) {
+        target[prop as keyof T] = val;
+        return true;
+      },
+      get: (target, prop, receiver) => {
+        // const val = target[prop as string];
+        // console.log("target", target);
+        // console.log("prop", prop);
+        // console.log("foo?", typeof target[prop as string]);
+        // console.log(typeof val === "function" && val.name);
+        if (
+          target.isSaved &&
+          target.constructor.prototype[prop]
+        ) {
+          console.log("receiver", receiver);
+
+          return (target.constructor.prototype[prop])(
+            receiver,
+          );
+        }
+        return target[prop as string];
+      },
+    });
+
+    // this.save();
+    // this.setAssociations;
+
+    // this.id = db.lastInsertRowId;
+
+    // this.isSaved = true;
+    // return proxy;
+    Object.assign(this, proxy);
+  }
+
+  tableName() {
+    return this.pluralize();
   }
 
   pluralize() {
     return (this.constructor as typeof Model).pluralize();
-  }
-
-  save() {
-    const { columns } = this.constructor as typeof Model;
-
-    const query = `INSERT INTO ${this.pluralize()} (${
-      columns.join(", ")
-    }) VALUES (${columns.map(() => "?")})`;
-
-    logger.debug(`columns: ${columns}`);
-
-    const values = columns.map((column) => this[column]);
-
-    logger.debug(`${query} with ${values}`);
-
-    const { db } = this.constructor as typeof Model;
-
-    db.query(query, values as QueryParameterSet);
-
-    this.id = db.lastInsertRowId;
   }
 
   toJSON() {
