@@ -1,11 +1,11 @@
 /** @jsxImportSource https://esm.sh/preact */
-import { RenderableProps } from "../../deps.ts";
+import { ExtendableProps } from "../../deps.ts";
 
 interface HeadProps {
   title?: string;
 }
 
-const Head = ({ children, title }: RenderableProps<HeadProps>) => (
+const Head = ({ children, title }: ExtendableProps<HeadProps>) => (
   <>
     {
       /* <script

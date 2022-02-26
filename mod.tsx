@@ -1,29 +1,32 @@
 /** @jsxImportSource https://esm.sh/preact */
 import {
   Application,
+  httpErrors,
   Router,
   send,
-} from "https://deno.land/x/oak@v10.1.0/mod.ts";
-import { parse } from "https://deno.land/std@0.117.0/path/mod.ts";
-// import { ensureFile } from "https://deno.land/std@0.117.0/fs/mod.ts";
+} from "https://deno.land/x/oak@v10.4.0/mod.ts";
+import { join, parse } from "https://deno.land/std@0.117.0/path/mod.ts";
+// import { ensureFile,  } from "https://deno.land/std@0.117.0/fs/mod.ts";
 import { getDirname } from "./utils/mod.ts";
 import logger from "./logger/mod.ts";
 import Head from "./components/core/Head.tsx";
+import App from "./components/core/App.tsx";
 import {
   ComponentType,
   debounce,
-  RenderableProps,
+  ExtendableProps,
   renderToString,
 } from "./deps.ts";
 import { readFileSync, titleCase } from "./utils/mod.ts";
 import { stylesheets } from "./styling/builder.ts";
 import { isDev } from "./utils/is.ts";
 import { Database, Model } from "./db/mod.ts";
+import { RouteContext } from "./router/mod.tsx";
 
 const awningRoot = getDirname(import.meta.url);
 const awningComponents = `${awningRoot}/components`;
 
-export type AwningPageProps = RenderableProps<{
+export type AwningPageProps = ExtendableProps<{
   session: SessionData;
 }>;
 
@@ -42,7 +45,7 @@ export interface SessionData {
   currentRoute: string | null;
 }
 
-export default ({
+export default async ({
   port = 5555,
   root,
   routes,
@@ -53,15 +56,9 @@ export default ({
   }
   const app = new Application<Ctx>();
 
-  // if (models?.length) {
-  //   const { db, createTable } = new Database();
-  //   models.forEach(createTable);
-  // }
-
   app.use(async ({ request, response }, next) => {
     logger.debug(`request-url: ${request.url}`);
     await next();
-    // logger.debug(response);
   });
 
   const sessionData: SessionData = {
@@ -74,72 +71,63 @@ export default ({
 
   const router = new Router();
 
-  Object.entries(routes).forEach(async ([route, nameOrConfig]) => {
-    // let resolvedRouteData: RouteConfig;
+  const UserlandHead = (await import(`${root}/components/Head.tsx`)).default;
 
-    // switch (typeof nameOrConfig) {
-    //   case "string":
-    //     resolvedRouteData = {
-    //       component:
-    //         (await import(`${root}/components/${titleCase(nameOrConfig)}.tsx`))
-    //           .default,
-    //     };
-    //     break;
-    //   case "object":
-    //     resolvedRouteData = nameOrConfig;
-    //     break;
-    //   default:
-    //     throw new Error(
-    //       `Expected string or object but RouteConfig is ${typeof nameOrConfig}.`,
-    //     );
-    // }
+  const pages = Array.from(
+    Deno.readDirSync(join(root, "components", "pages")),
+  ).map((page) => page.name);
 
-    const UserlandHead = (await import(`${root}/components/Head.tsx`)).default;
+  // Object.entries(routes).forEach(([route, nameOrConfig]) => {
+  pages.forEach((page) => {
+    const pageName = parse(page).name.toLowerCase();
+    const isIndex = pageName === "index";
+    const route = isIndex ? "/" : `/${pageName}`;
 
-    let foo = 0;
-    router.get(route, async ({ response, ...context }, next) => {
-      console.log(stylesheets);
-      const Component = (await import(
-        `${root}/components/${titleCase(nameOrConfig as string)}.tsx?${foo++}`
-      )).default;
+    router.get(
+      route,
+      async ({ request, response, ...context }, next) => {
+        const Page = (await import(
+          `${root}/components/pages/${page}`
+        )).default;
 
-      const rendered = renderToString(
-        <Component session={{ currentRoute: route }} />,
-      );
+        const body = renderToString(
+          <App
+            url={request.url.pathname}
+            root={root}
+            pages={[{ route, component: Page }]}
+          />,
+        );
 
-      response.body = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            ${
-        stylesheets.map(([marker, ss]) =>
+        const styles = stylesheets.map(([marker, ss]) =>
           `<style data-styles-id="${marker}">${ss}</style>`
-        )
-          .join("")
-      }
-            <script>
-            ${
-        isDev && `
-                window.AWNING_DEV = true;
-              `
-      }
-            </script>
-            ${
-        renderToString(
+        ).join("");
+
+        const head = renderToString(
           <Head>
             <UserlandHead />
           </Head>,
-        )
-      }
+        );
+
+        response.body = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            ${styles}
+            <script>
+              ${isDev && "window.AWNING_DEV = true;"}
+              window.pages = [${pages.map((page) => `"${page}"`)}]
+            </script>
+            ${head}
           </head>
           <body>
-            ${rendered}
+            ${body}
           </body>
         </html>
       `;
 
-      await next();
-    });
+        await next();
+      },
+    );
   });
 
   router.get("/sync", async (ctx, next) => {
@@ -164,8 +152,8 @@ export default ({
         safeCloseWatcher();
       };
 
-      ws.onerror = (ev) => {
-        console.log("ws error", ev);
+      ws.onerror = (ev: Event & { message?: string }) => {
+        console.log("ws error", ev.message);
         safeCloseWatcher();
       };
 
@@ -190,9 +178,14 @@ export default ({
 
   app.use(router.routes());
   app.use(router.allowedMethods());
-  app.use(async (ctx) => {
+  app.use(async (ctx, next) => {
+    if (ctx.response.body) {
+      return next();
+    }
+
     const { pathname } = ctx.request.url;
     const { ext, dir } = parse(pathname);
+    console.log("hit here", pathname);
     if ([".ts", ".tsx"].includes(ext)) {
       try {
         const filePath = `${awningRoot}/public${pathname}`;
@@ -203,14 +196,8 @@ export default ({
             bundle: "module",
             compilerOptions: {
               jsxFactory: "h",
-              // jsx: "react-jsx",
               jsxImportSource: "https://esm.sh/preact",
             },
-            // bundle: "module",
-            // check: true,
-            // sources: {
-            //   "Index.tsx": `${root}/components/Index.tsx`,
-            // },
           });
           ctx.response.body = bundle.files["deno:///bundle.js"];
           ctx.response.type = ".js";
@@ -225,7 +212,6 @@ export default ({
           check: false,
           compilerOptions: {
             jsxFactory: "h",
-            // jsx: "react-jsx",
             jsxImportSource: "https://esm.sh/preact",
           },
         });
@@ -238,13 +224,19 @@ export default ({
           // Slice off /awning/public
           await send(ctx, pathname.slice(14), { root: `${awningRoot}/public` });
         } catch (e) {
-          ctx.throw(e);
+          if (e instanceof httpErrors.NotFound) {
+            ctx.throw(404);
+          }
+          logger.error(e);
         }
       } else {
         try {
           await ctx.send({ root: `${root}/public` });
         } catch (e) {
-          ctx.throw(e);
+          if (e instanceof httpErrors.NotFound) {
+            ctx.throw(404);
+          }
+          logger.error(e);
         }
       }
     }

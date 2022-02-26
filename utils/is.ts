@@ -6,14 +6,14 @@ export const isDev = isServer
     Deno.env.get("AWNING_DEV")?.toLowerCase() === "true"
   : (window as any).AWNING_DEV === true;
 
-export const server = (cb?: () => unknown): boolean => {
+export const server = (cb?: () => void): boolean => {
   if (isServer) {
     cb && cb();
   }
   return isServer;
 };
 
-export const client = (cb?: () => unknown): boolean => {
+export const client = (cb?: () => void): boolean => {
   if (isClient) {
     cb && cb();
   }
