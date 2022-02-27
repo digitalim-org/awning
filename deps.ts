@@ -15,7 +15,9 @@ interface ExtendableAdditions {
   className?: string;
 }
 
-export type ExtendableProps<T> = RenderableProps<ExtendableAdditions & T>;
+export type ExtendableProps<T = null> = RenderableProps<
+  ExtendableAdditions & T
+>;
 
 export {
   createContext,
@@ -25,6 +27,7 @@ export {
   toChildArray,
 } from "https://esm.sh/preact@10.6.4";
 export { useContext, useState } from "https://esm.sh/preact@10.6.4/hooks";
+export type { StateUpdater } from "https://esm.sh/preact@10.6.4/hooks";
 export { default as renderToString } from "https://esm.sh/preact-render-to-string?deps=preact@10.6.4";
 
 export { debounce } from "https://deno.land/std/async/mod.ts";

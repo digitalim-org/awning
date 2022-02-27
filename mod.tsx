@@ -91,11 +91,7 @@ export default async ({
         )).default;
 
         const body = renderToString(
-          <App
-            url={request.url.pathname}
-            root={root}
-            pages={[{ route, component: Page }]}
-          />,
+          <App url={request.url.pathname} />,
         );
 
         const styles = stylesheets.map(([marker, ss]) =>
